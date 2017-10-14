@@ -15,10 +15,16 @@ dependencies:
 - zlib=1.2.11=0
 - pip:
   - bleach==1.5.0
+  - boto3==1.4.7
+  - botocore==1.7.28
+  - docutils==0.14
   - html5lib==0.9999999
+  - jmespath==0.9.3
   - markdown==2.6.9
   - numpy==1.13.3
   - protobuf==3.4.0
+  - python-dateutil==2.6.1
+  - s3transfer==0.1.11
   - six==1.11.0
   - tensorflow==1.3.0
   - tensorflow-tensorboard==0.1.8
