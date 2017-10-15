@@ -22,8 +22,7 @@ STR_FORMAT = "format"
 # AWS_ACCESS_KEY = os.environ['AWS_ACCESS_KEY']
 #AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY']
 AWS_ACCESS_KEY = ''
-AWS_SECRET_ACCESS_KEY = '/XxJN9JWpKLz'
-
+AWS_SECRET_ACCESS_KEY = ''
 
 def get_image_info():
     image_info = {}
@@ -68,29 +67,28 @@ def main():
     print(feature)
     features.append(feature)
 
-    # xb = np.array(features)
+    xb = np.array(features)
 
-    #
-    # #print(xb)
-    # nq = 5
-    # xq = np.copy(xb[:nq])
-    # nb, d = xb.shape
-    # n_candidates = 10
-    #
-    # # Index (faiss)
-    # s = time.time()
-    # index = faiss.IndexFlatL2(xb.shape[1])
-    # ids = np.arange(xb.shape[0])
-    # index2 = faiss.IndexIDMap(index)
-    # print(index.is_trained)
-    # print(xb)
-    # print(index.ntotal)
-    # #index.add(xb)
-    # index2.add_with_ids(xb, ids)
-    # print(index.ntotal)
-    # print('Index time (faiss): {:.2f} [ms]'.format((time.time() - s) * 1000))
-    #
-    # faiss.write_index(index2, 'faiss.index')
+    #print(xb)
+    nq = 5
+    xq = np.copy(xb[:nq])
+    nb, d = xb.shape
+    n_candidates = 10
+
+    # Index (faiss)
+    s = time.time()
+    index = faiss.IndexFlatL2(xb.shape[1])
+    ids = np.arange(xb.shape[0])
+    index2 = faiss.IndexIDMap(index)
+    print(index.is_trained)
+    print(xb)
+    print(index.ntotal)
+    #index.add(xb)
+    index2.add_with_ids(xb, ids)
+    print(index.ntotal)
+    print('Index time (faiss): {:.2f} [ms]'.format((time.time() - s) * 1000))
+
+    faiss.write_index(index2, 'faiss.index')
     #
     # # Search (faiss)
     # s = time.time()
@@ -107,7 +105,6 @@ def main():
     # # Evaluate (faiss (quantize nprobe=10))
     # # evaluate(result_i, result_i3)
 
-
 # Evaluate
 def evaluate(arr1, arr2):
     top_1 = (arr1[:,0] == arr2[:,0]).sum() / arr1.shape[0]
@@ -117,7 +114,6 @@ def evaluate(arr1, arr2):
         total += (cnt >= 2).sum()
     top_k = total / arr1.shape[0] / arr1.shape[1]
     print('recall@1: {:.2f}, top {} recall: {:.2f}'.format(top_1, arr1.shape[1], top_k))
-
 
 if __name__ == "__main__":
     main()
