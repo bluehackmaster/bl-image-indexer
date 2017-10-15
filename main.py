@@ -1,6 +1,6 @@
 import numpy as np
 import time
-# import faiss
+import faiss
 from helper import *
 from util import s3
 
@@ -8,7 +8,7 @@ import json
 import os
 from os import listdir
 from os.path import isfile, join
-MODEL_PATH = '/dataset/classify_image_graph_def.pb'
+MODEL_PATH = '/dataset/inception_v3/classify_image_graph_def.pb'
 IMG_NUM = 1408
 QUERY_IMG = 22
 CANDIDATES = 5
