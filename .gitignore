@@ -128,7 +128,6 @@ pip-selfcheck.json
 # Icon must end with two \r
 Icon
 
-
 # Thumbnails
 ._*
 
@@ -192,3 +191,6 @@ crashlytics.properties
 crashlytics-build.properties
 fabric.properties
 
+main.sh
+tmp.jpg
+faiss.index

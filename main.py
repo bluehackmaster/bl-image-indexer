@@ -4,6 +4,7 @@ import faiss
 from helper import *
 from util import s3
 
+import tensorflow as tf
 import json
 import os
 from os import listdir
