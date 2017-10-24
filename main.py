@@ -8,7 +8,6 @@ import json
 import os
 from os import listdir
 from os.path import isfile, join
-MODEL_PATH = '/dataset/inception_v3/classify_image_graph_def.pb'
 IMG_NUM = 1408
 QUERY_IMG = 22
 CANDIDATES = 5
@@ -19,12 +18,17 @@ STR_CLASS_CODE = "class_code"
 STR_NAME = "name"
 STR_FORMAT = "format"
 
-# AWS_ACCESS_KEY = os.environ['AWS_ACCESS_KEY']
-#AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY']
-AWS_ACCESS_KEY = ''
-AWS_SECRET_ACCESS_KEY = ''
+AWS_ACCESS_KEY = os.environ['AWS_ACCESS_KEY']
+AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY']
+
+CLASSIFY_GRAPH = os.environ['CLASSIFY_GRAPH']
 
 def get_image_info():
+    # ToDo: BRPOP image ID from 'image_queue' in the 'bl-mem-store'
+
+    # ToDo: Get image info from 'image_info' in the 'bl-mem-store'
+
+    # These are hardcoded.
     image_info = {}
     image_info[STR_STORAGE] = 's3'
     image_info[STR_BUCKET] = 'bluelens-style-object'
@@ -45,11 +49,11 @@ def get_image():
   file = download_image(image_info)
   return file
 
-def get_files():
-    return [f for f in listdir(join(DATA_DIR, FOLDER)) if isfile(join(DATA_DIR, FOLDER, f))]
+# def get_files():
+#     return [f for f in listdir(join(DATA_DIR, FOLDER)) if isfile(join(DATA_DIR, FOLDER, f))]
 
 def main():
-  with tf.gfile.FastGFile(MODEL_PATH, 'rb') as f:
+  with tf.gfile.FastGFile(CLASSIFY_GRAPH, 'rb') as f:
       graph_def = tf.GraphDef()
       graph_def.ParseFromString(f.read())
       _ = tf.import_graph_def(graph_def, name='')
@@ -89,21 +93,6 @@ def main():
     print('Index time (faiss): {:.2f} [ms]'.format((time.time() - s) * 1000))
 
     faiss.write_index(index2, 'faiss.index')
-    #
-    # # Search (faiss)
-    # s = time.time()
-    # result_d1, result_i1 = index2.search(xq, n_candidates)
-    # print(xq)
-    # print(result_d1)
-    # print(result_i1)
-    # print('Average query time (faiss): {:.2f} [ms]'.format((time.time() - s) * 1000 / nq))
-    #
-    # # Evaluate (faiss)
-    # evaluate(result_i1, result_i1)
-    #
-    #
-    # # Evaluate (faiss (quantize nprobe=10))
-    # # evaluate(result_i, result_i3)
 
 # Evaluate
 def evaluate(arr1, arr2):
