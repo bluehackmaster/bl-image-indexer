@@ -1,42 +1,51 @@
 import numpy as np
 import time
 import faiss
-from helper import *
+import signal
+import sys
 from util import s3
 
 import tensorflow as tf
 import json
+import redis
 import os
+from redis import Redis
 from os import listdir
 from os.path import isfile, join
 IMG_NUM = 1408
 QUERY_IMG = 22
 CANDIDATES = 5
 
-STR_BUCKET = "bucket"
-STR_STORAGE = "storage"
-STR_CLASS_CODE = "class_code"
-STR_NAME = "name"
-STR_FORMAT = "format"
+STR_BUCKET = "_bucket"
+STR_STORAGE = "_storage"
+STR_CLASS_CODE = "_class_code"
+STR_NAME = "_name"
+STR_FORMAT = "_format"
 
 AWS_ACCESS_KEY = os.environ['AWS_ACCESS_KEY']
 AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY']
 
 CLASSIFY_GRAPH = os.environ['CLASSIFY_GRAPH']
+REDIS_SERVER = os.environ['REDIS_SERVER']
 
-def get_image_info():
-    # ToDo: BRPOP image ID from 'image_queue' in the 'bl-mem-store'
+rconn = redis.StrictRedis(REDIS_SERVER)
 
-    # ToDo: Get image info from 'image_info' in the 'bl-mem-store'
 
-    # These are hardcoded.
-    image_info = {}
-    image_info[STR_STORAGE] = 's3'
-    image_info[STR_BUCKET] = 'bluelens-style-object'
-    image_info[STR_CLASS_CODE] = 'n0100016'
-    image_info[STR_NAME] = '59e194880eb291000ff42a74'
-    image_info[STR_FORMAT] = 'jpg'
-    return image_info
+REDIS_KEY_IMAGE_INFO = 'image_info'
+REDIS_KEY_IMAGE_QUEUE = 'image_queue'
+REDIS_KEY_IMAGE_INDEX = 'image_index'
+
+def get_image_info(id):
+  data = rconn.hget(REDIS_KEY_IMAGE_INFO, id)
+  image_info =json.loads(data)
+  print(image_info)
+    # image_info = {}
+    # image_info[STR_STORAGE] =
+    # image_info[STR_BUCKET] = rconn.hget(KEY_IMAGE_INFO, 'bucket')
+    # image_info[STR_CLASS_CODE] = rconn.hget(KEY_IMAGE_INFO, 'class_code')
+    # image_info[STR_NAME] = rconn.hget(KEY_IMAGE_INFO, 'name')
+    # image_info[STR_FORMAT] = rconn.hget(KEY_IMAGE_INFO, 'format')
+  return image_info
 
 def download_image(image_info):
   TMP_CROP_IMG_FILE = './tmp.jpg'
@@ -45,8 +54,8 @@ def download_image(image_info):
   storage.download_file_from_bucket(image_info[STR_BUCKET], TMP_CROP_IMG_FILE, key)
   return TMP_CROP_IMG_FILE
 
-def get_image():
-  image_info = get_image_info()
+def get_image(id):
+  image_info = get_image_info(id)
   file = download_image(image_info)
   return file
 
@@ -54,6 +63,7 @@ def get_image():
 #     return [f for f in listdir(join(DATA_DIR, FOLDER)) if isfile(join(DATA_DIR, FOLDER, f))]
 
 def main():
+  stop_requested = False
   with tf.gfile.FastGFile(CLASSIFY_GRAPH, 'rb') as f:
       graph_def = tf.GraphDef()
       graph_def.ParseFromString(f.read())
@@ -61,39 +71,55 @@ def main():
 
   with tf.Session() as sess:
       pool3 = sess.graph.get_tensor_by_name('pool_3:0')
+
+  def items():
+    while True:
+      yield rconn.blpop([REDIS_KEY_IMAGE_QUEUE])
+
+
+  def request_stop(signum, frame):
+    print 'stopping'
+    stop_requested = True
+    rconn.connection_pool.disconnect()
+    print 'connection closed'
+
+  signal.signal(signal.SIGINT, request_stop)
+  signal.signal(signal.SIGTERM, request_stop)
+
+  index = faiss.IndexFlatL2(2048)
+  index2 = faiss.IndexIDMap(index)
+  for item in items():
+    key, value = item
+    f = get_image(value)
+    with tf.gfile.GFile(f, 'rb') as fid:
+      image_data = fid.read()
+      pool3_features = sess.run(pool3,{'DecodeJpeg/contents:0': image_data})
+      feature = np.squeeze(pool3_features)
+      print(feature)
       features = []
+      features.append(feature)
 
-  # while True:
-  f = get_image()
-  with tf.gfile.GFile(f, 'rb') as fid:
-    image_data = fid.read()
-    pool3_features = sess.run(pool3,{'DecodeJpeg/contents:0': image_data})
-    feature = np.squeeze(pool3_features)
-    print(feature)
-    features.append(feature)
+      xb = np.array(features)
+      np.arange
 
-    xb = np.array(features)
+      # nq = 5
+      # xq = np.copy(xb[:nq])
+      # nb, d = xb.shape
+      # n_candidates = 10
 
-    #print(xb)
-    nq = 5
-    xq = np.copy(xb[:nq])
-    nb, d = xb.shape
-    n_candidates = 10
+      # Index (faiss)
+      s = time.time()
+      id = rconn.llen(REDIS_KEY_IMAGE_INDEX)
+      ids = np.array([].append(id))
+      # print(index.is_trained)
+      print(xb)
+      # print(index.ntotal)
+      #index.add(xb)
+      index2.add_with_ids(xb, ids)
+      # print(index.ntotal)
+      print('Index time (faiss): {:.2f} [ms]'.format((time.time() - s) * 1000))
 
-    # Index (faiss)
-    s = time.time()
-    index = faiss.IndexFlatL2(xb.shape[1])
-    ids = np.arange(xb.shape[0])
-    index2 = faiss.IndexIDMap(index)
-    print(index.is_trained)
-    print(xb)
-    print(index.ntotal)
-    #index.add(xb)
-    index2.add_with_ids(xb, ids)
-    print(index.ntotal)
-    print('Index time (faiss): {:.2f} [ms]'.format((time.time() - s) * 1000))
-
-    faiss.write_index(index2, 'faiss.index')
+      faiss.write_index(index2, 'faiss.index')
 
 # Evaluate
 def evaluate(arr1, arr2):

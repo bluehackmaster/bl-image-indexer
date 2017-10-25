@@ -194,3 +194,5 @@ fabric.properties
 main.sh
 tmp.jpg
 faiss.index
+classify_image_graph_def.pb
+kubernetes/config.yaml
