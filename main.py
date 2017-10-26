@@ -38,7 +38,7 @@ REDIS_KEY_IMAGE_INDEX = 'image_index'
 def get_image_info(id):
   data = rconn.hget(REDIS_KEY_IMAGE_INFO, id)
   image_info =json.loads(data)
-  print(image_info)
+  # print(image_info)
     # image_info = {}
     # image_info[STR_STORAGE] =
     # image_info[STR_BUCKET] = rconn.hget(KEY_IMAGE_INFO, 'bucket')
@@ -64,6 +64,10 @@ def get_image(id):
 
 def main():
   stop_requested = False
+  rconn.delete(REDIS_KEY_IMAGE_INDEX)
+
+  p = rconn.pubsub()
+  p.subscribe('crop/done')
   with tf.gfile.FastGFile(CLASSIFY_GRAPH, 'rb') as f:
       graph_def = tf.GraphDef()
       graph_def.ParseFromString(f.read())
@@ -89,37 +93,34 @@ def main():
   index = faiss.IndexFlatL2(2048)
   index2 = faiss.IndexIDMap(index)
   for item in items():
-    key, value = item
-    f = get_image(value)
+    features = []
+    key, image_id = item
+    f = get_image(image_id)
     with tf.gfile.GFile(f, 'rb') as fid:
       image_data = fid.read()
       pool3_features = sess.run(pool3,{'DecodeJpeg/contents:0': image_data})
       feature = np.squeeze(pool3_features)
-      print(feature)
-      features = []
       features.append(feature)
-
       xb = np.array(features)
-      np.arange
 
-      # nq = 5
-      # xq = np.copy(xb[:nq])
-      # nb, d = xb.shape
-      # n_candidates = 10
-
-      # Index (faiss)
       s = time.time()
-      id = rconn.llen(REDIS_KEY_IMAGE_INDEX)
-      ids = np.array([].append(id))
-      # print(index.is_trained)
-      print(xb)
-      # print(index.ntotal)
-      #index.add(xb)
+      index = faiss.IndexFlatL2(xb.shape[1])
+      rconn.lpush(REDIS_KEY_IMAGE_INDEX, image_id)
+      idx = rconn.llen(REDIS_KEY_IMAGE_INDEX)
+      print(idx)
+      ids = np.array([idx])
+      index2 = faiss.IndexIDMap(index)
       index2.add_with_ids(xb, ids)
-      # print(index.ntotal)
-      print('Index time (faiss): {:.2f} [ms]'.format((time.time() - s) * 1000))
+      check_redis_sub(p, index2)
 
-      faiss.write_index(index2, 'faiss.index')
+
+def check_redis_sub(pubsub, index):
+  message = pubsub.get_message()
+  if message:
+    command = message['data']
+    if command == b'DONE':
+      print("==== Completed indexing ===")
+      faiss.write_index(index, 'faiss.index')
 
 # Evaluate
 def evaluate(arr1, arr2):
