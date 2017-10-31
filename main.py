@@ -4,6 +4,7 @@ import faiss
 import signal
 import sys
 from util import s3
+from threading import Timer
 
 import tensorflow as tf
 import json
@@ -37,6 +38,7 @@ logging.basicConfig(filename='./log/main.log', level=logging.DEBUG)
 rconn = redis.StrictRedis(REDIS_SERVER, port=6379)
 feature_extractor = feature_extract.Feature()
 
+heart_bit = True
 
 def job():
   logging.debug('start')
@@ -66,20 +68,27 @@ def job():
     image_info['feature'] = feature.tolist()
     rconn.lpush(REDIS_IMAGE_FEATURE_QUEUE, json.dumps(image_info))
 
-    check_queue()
+    global  heart_bit
+    heart_bit = True
 
-def check_queue():
-  queue_size = rconn.llen(REDIS_IMAGE_INDEX_QUEUE)
-
-  if queue_size == 0:
+def check_health():
+  print('check_health: ' + str(heart_bit))
+  logging.debug('check_health: ' + str(heart_bit))
+  global  heart_bit
+  if heart_bit == True:
+    heart_bit = False
+    Timer(60, check_health, ()).start()
+  else:
     exit()
 
 def exit():
   print('exit: ' + SPAWN_ID)
+  logging.debug('exit: ' + SPAWN_ID)
   data = {}
   data['namespace'] = 'index'
   data['id'] = SPAWN_ID
   spawn = spawning_pool.SpawningPool()
+  spawn.setServerUrl(REDIS_SERVER)
   spawn.delete(data)
 
 def download_image(image_info):
@@ -90,4 +99,5 @@ def download_image(image_info):
   return TMP_CROP_IMG_FILE
 
 if __name__ == "__main__":
+  Timer(60, check_health, ()).start()
   job()
