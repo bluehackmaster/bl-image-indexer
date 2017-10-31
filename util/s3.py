@@ -23,6 +23,8 @@ class S3(object):
         return file_url
 
     def download_file_from_bucket(self, bucket, file_path, key):
+        print(bucket)
+        print(key)
         """ Download file from S3 Bucket """
         with open(file_path, 'wb') as data:
             self.__s3.download_fileobj(bucket, key, data)
