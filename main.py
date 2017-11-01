@@ -33,7 +33,6 @@ DATA_SOURCE_DB = 'DB'
 REDIS_IMAGE_FEATURE_QUEUE = 'bl:image:feature:queue'
 REDIS_IMAGE_INDEX_QUEUE = 'bl:image:index:queue'
 
-rconn = redis.StrictRedis(REDIS_SERVER)
 logging.basicConfig(filename='./log/main.log', level=logging.DEBUG)
 rconn = redis.StrictRedis(REDIS_SERVER, port=6379)
 feature_extractor = feature_extract.Feature()
@@ -81,9 +80,15 @@ def check_health():
   else:
     exit()
 
+def redis_pub(message):
+  rconn.publish('index', message)
+
 def exit():
   print('exit: ' + SPAWN_ID)
   logging.debug('exit: ' + SPAWN_ID)
+
+  redis_pub('DONE')
+
   data = {}
   data['namespace'] = 'index'
   data['id'] = SPAWN_ID
