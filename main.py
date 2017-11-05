@@ -26,6 +26,7 @@ AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY']
 
 SPAWN_ID = os.environ['SPAWN_ID']
 REDIS_SERVER = os.environ['REDIS_SERVER']
+REDIS_PASSWORD = os.environ['REDIS_PASSWORD']
 # DATA_SOURCE = os.environ['DATA_SOURCE']
 DATA_SOURCE_QUEUE = 'REDIS_QUEUE'
 DATA_SOURCE_DB = 'DB'
@@ -34,13 +35,15 @@ REDIS_IMAGE_FEATURE_QUEUE = 'bl:image:feature:queue'
 REDIS_IMAGE_INDEX_QUEUE = 'bl:image:index:queue'
 
 logging.basicConfig(filename='./log/main.log', level=logging.DEBUG)
-rconn = redis.StrictRedis(REDIS_SERVER, port=6379)
+rconn = redis.StrictRedis(REDIS_SERVER, port=6379, password=REDIS_PASSWORD)
 feature_extractor = feature_extract.Feature()
 
 heart_bit = True
 
 def job():
   logging.debug('start')
+  print('redis password')
+  print(REDIS_PASSWORD)
   def items():
     while True:
       yield rconn.blpop([REDIS_IMAGE_INDEX_QUEUE])
@@ -94,6 +97,7 @@ def exit():
   data['id'] = SPAWN_ID
   spawn = spawning_pool.SpawningPool()
   spawn.setServerUrl(REDIS_SERVER)
+  spawn.setServerPassword(REDIS_PASSWORD)
   spawn.delete(data)
 
 def download_image(image_info):
