@@ -1,25 +1,19 @@
-import numpy as np
-import time
-import faiss
 import signal
-import sys
+import pickle
 from util import s3
 from threading import Timer
 
-import tensorflow as tf
-import json
 import redis
 import os
-import logging
 
-from magi import feature_extract
+from stylelens_feature.feature_extract import ExtractFeature
 from bluelens_spawning_pool import spawning_pool
+from bluelens_log import Logging
 
 STR_BUCKET = "bucket"
 STR_STORAGE = "storage"
 STR_CLASS_CODE = "class_code"
 STR_NAME = "name"
-STR_FORMAT = "format"
 
 AWS_ACCESS_KEY = os.environ['AWS_ACCESS_KEY']
 AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY']
@@ -31,66 +25,63 @@ REDIS_PASSWORD = os.environ['REDIS_PASSWORD']
 DATA_SOURCE_QUEUE = 'REDIS_QUEUE'
 DATA_SOURCE_DB = 'DB'
 
-REDIS_IMAGE_FEATURE_QUEUE = 'bl:image:feature:queue'
-REDIS_IMAGE_INDEX_QUEUE = 'bl:image:index:queue'
+REDIS_OBJECT_FEATURE_QUEUE = 'bl:object:feature:queue'
+REDIS_OBJECT_INDEX_QUEUE = 'bl:object:index:queue'
 
-logging.basicConfig(filename='./log/main.log', level=logging.DEBUG)
+options = {
+  'REDIS_SERVER': REDIS_SERVER,
+  'REDIS_PASSWORD': REDIS_PASSWORD
+}
+log = Logging(options, tag='bl-image-indexer')
 rconn = redis.StrictRedis(REDIS_SERVER, port=6379, password=REDIS_PASSWORD)
-feature_extractor = feature_extract.Feature()
+feature_extractor = ExtractFeature(use_gpu=True)
+storage = s3.S3(AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY)
 
 heart_bit = True
 
-def job():
-  logging.debug('start')
-  print('redis password')
-  print(REDIS_PASSWORD)
+def start_index():
+  log.info('start_index')
   def items():
     while True:
-      yield rconn.blpop([REDIS_IMAGE_INDEX_QUEUE])
+      yield rconn.blpop([REDIS_OBJECT_INDEX_QUEUE])
 
   def request_stop(signum, frame):
-    print('stopping')
+    log.info('stopping')
     rconn.connection_pool.disconnect()
-    print('connection closed')
+    log.info('connection closed')
 
   signal.signal(signal.SIGINT, request_stop)
   signal.signal(signal.SIGTERM, request_stop)
 
   for item in items():
-    key, image_data = item
-    print(image_data)
-    logging.debug(image_data)
-    if type(image_data) is str:
-      image_info = json.loads(image_data)
-    elif type(image_data) is bytes:
-      image_info = json.loads(image_data.decode('utf-8'))
+    key, obj_data = item
+    obj = pickle.loads(obj_data)
+    log.debug(obj)
 
-    file = download_image(image_info)
-    feature = feature_extractor.extract(file)
-    image_info['feature'] = feature.tolist()
-    rconn.lpush(REDIS_IMAGE_FEATURE_QUEUE, json.dumps(image_info))
+    try:
+      file = download_image(obj)
+    except Exception as e:
+      log.error(str(e))
+      continue
+    feature = feature_extractor.extract_feature(file)
+    log.debug(feature)
+    obj['feature'] = feature.tolist()
+    rconn.lpush(REDIS_OBJECT_FEATURE_QUEUE, pickle.dumps(obj, protocol=2))
 
     global  heart_bit
     heart_bit = True
 
 def check_health():
-  print('check_health: ' + str(heart_bit))
-  logging.debug('check_health: ' + str(heart_bit))
   global  heart_bit
+  log.info('check_health: ' + str(heart_bit))
   if heart_bit == True:
     heart_bit = False
-    Timer(60, check_health, ()).start()
+    Timer(120, check_health, ()).start()
   else:
     exit()
 
-def redis_pub(message):
-  rconn.publish('index', message)
-
 def exit():
-  print('exit: ' + SPAWN_ID)
-  logging.debug('exit: ' + SPAWN_ID)
-
-  redis_pub('DONE')
+  log.info('exit: ' + SPAWN_ID)
 
   data = {}
   data['namespace'] = 'index'
@@ -100,13 +91,13 @@ def exit():
   spawn.setServerPassword(REDIS_PASSWORD)
   spawn.delete(data)
 
-def download_image(image_info):
+def download_image(obj):
   TMP_CROP_IMG_FILE = './tmp.jpg'
-  storage = s3.S3(AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY)
-  key = os.path.join(image_info[STR_CLASS_CODE], image_info[STR_NAME]+ '.' + image_info[STR_FORMAT])
-  storage.download_file_from_bucket(image_info[STR_BUCKET], TMP_CROP_IMG_FILE, key)
+  key = os.path.join(obj[STR_CLASS_CODE], obj[STR_NAME]+ '.jpg')
+  log.debug('Try download : ' + str(key))
+  storage.download_file_from_bucket(obj[STR_BUCKET], TMP_CROP_IMG_FILE, key)
   return TMP_CROP_IMG_FILE
 
 if __name__ == "__main__":
-  Timer(60, check_health, ()).start()
-  job()
+  Timer(120, check_health, ()).start()
+  start_index()
