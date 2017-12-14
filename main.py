@@ -94,7 +94,7 @@ def exit():
 
 def download_image(obj):
   TMP_CROP_IMG_FILE = './tmp.jpg'
-  key = os.path.join(obj[STR_CLASS_CODE], obj[STR_NAME]+ '.jpg')
+  key = os.path.join(RELEASE_MODE, obj[STR_CLASS_CODE], obj[STR_NAME]+ '.jpg')
   log.debug('Try download : ' + str(key))
   storage.download_file_from_bucket(obj[STR_BUCKET], TMP_CROP_IMG_FILE, key)
   return TMP_CROP_IMG_FILE
