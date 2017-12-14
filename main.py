@@ -21,6 +21,7 @@ AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY']
 SPAWN_ID = os.environ['SPAWN_ID']
 REDIS_SERVER = os.environ['REDIS_SERVER']
 REDIS_PASSWORD = os.environ['REDIS_PASSWORD']
+RELEASE_MODE = os.environ['RELEASE_MODE']
 # DATA_SOURCE = os.environ['DATA_SOURCE']
 DATA_SOURCE_QUEUE = 'REDIS_QUEUE'
 DATA_SOURCE_DB = 'DB'
@@ -84,7 +85,7 @@ def exit():
   log.info('exit: ' + SPAWN_ID)
 
   data = {}
-  data['namespace'] = 'index'
+  data['namespace'] = RELEASE_MODE
   data['id'] = SPAWN_ID
   spawn = spawning_pool.SpawningPool()
   spawn.setServerUrl(REDIS_SERVER)

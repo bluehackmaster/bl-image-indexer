@@ -1,5 +1,5 @@
 bleach==1.5.0
-bluelens-log==1.0.1
+bluelens-log==1.0.2
 bluelens-spawning-pool==1.0.9
 boto3==1.4.7
 botocore==1.7.47
@@ -18,7 +18,7 @@ python-dateutil==2.6.1
 redis==2.10.6
 s3transfer==0.1.11
 six==1.11.0
-stylelens-feature==1.0.4
+stylelens-feature==1.0.6
 tensorflow==1.4.0
 tensorflow-tensorboard==0.4.0rc3
 urllib3==1.22
