@@ -19,7 +19,7 @@ redis==2.10.6
 s3transfer==0.1.11
 six==1.11.0
 stylelens-feature==1.0.6
-tensorflow==1.4.0
+tensorflow==2.6.4
 tensorflow-tensorboard==0.4.0rc3
 urllib3==1.22
 Werkzeug==0.12.2
